@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handwriting AI Trainer (1-5)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+
+        .ai-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            font-size: 0.85em;
+            margin-bottom: 20px;
+        }
+
+        .progress-container {
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .instruction {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 5px;
+            font-size: 1.05em;
+        }
+
+        .drawing-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .canvas-container {
+            position: relative;
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        #drawingCanvas, #testCanvas {
+            display: block;
+            cursor: crosshair;
+            border-radius: 8px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: bold;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .clear-btn {
+            background: #dc3545;
+        }
+
+        .clear-btn:hover:not(:disabled) {
+            box-shadow: 0 10px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        .samples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+        }
+
+        .sample-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .sample-item canvas {
+            width: 60px;
+            height: 60px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .sample-item .label {
+            margin-top: 5px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .training-info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-size: 0.95em;
+        }
+
+        .epoch-info {
+            margin-top: 10px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .loss-display {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+
+        .prediction-result {
+            background: #f0f0f0;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .predicted-number {
+            font-size: 4em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .confidence-text {
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .all-predictions {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .prediction-item {
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e0e0e0;
+        }
+
+        .prediction-item.top {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .prediction-digit {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .prediction-confidence {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .accuracy-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .accuracy-summary h2 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✍️ Handwriting AI Trainer</h1>
+        <p class="subtitle">Train a neural network to recognize numbers 1-5!</p>
+        <div style="text-align: center;">
+            <span class="ai-badge">🧠 Powered by TensorFlow.js</span>
+        </div>
+
+        <div id="trainingPhase">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%">
+                        <span id="progressPercent">0%</span>
+                    </div>
+                </div>
+                <div class="progress-text">
+                    <span id="currentDigitPrompt">Draw number: <strong id="requestedDigit">1</strong></span>
+                    <span style="display: block; margin-top: 5px; font-size: 0.9em;">
+                        Sample <span id="currentSample">1</span> of 3 for this digit
+                    </span>
+                </div>
+            </div>
+
+            <div class="instruction">
+                ✏️ <strong>Draw the number <span id="instructionDigit">1</span></strong> on the canvas below, then click "Save Sample"
+            </div>
+
+            <div class="drawing-area">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 5em; font-weight: bold; color: #667eea; opacity: 0.3;">
+                        <span id="displayDigit">1</span>
+                    </div>
+                    <div style="color: #666; font-size: 0.9em;">Draw this number ↑</div>
+                </div>
+
+                <div class="canvas-container">
+                    <canvas id="drawingCanvas" width="280" height="280"></canvas>
+                </div>
+
+                <div class="controls">
+                    <button class="clear-btn" onclick="clearCanvas()">Clear Canvas</button>
+                    <button onclick="saveSample()" id="saveBtn">Save Sample</button>
+                </div>
+            </div>
+
+            <div id="samplesSection" style="display: none;">
+                <h3 style="color: #667eea; margin-bottom: 10px;">Your Training Samples:</h3>
+                <div class="samples-grid" id="samplesGrid"></div>
+            </div>
+        </div>
+
+        <div id="testingPhase" class="hidden">
+            <div class="loading" id="loadingTest">
+                <div class="spinner"></div>
+                <div>🧠 Training the neural network...</div>
+                <div class="training-info">
+                    <strong>Training Progress:</strong>
+                    <div class="epoch-info" id="epochInfo">Preparing data...</div>
+                    <div class="loss-display" id="lossDisplay">Loss: -- | Accuracy: --</div>
+                </div>
+            </div>
+
+            <div id="testResults" class="hidden">
+                <div class="accuracy-summary">
+                    <h2>🎉 Model Trained Successfully!</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalSamples">0</div>
+                            <div class="stat-label">Training Samples</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="finalAccuracy">0%</div>
+                            <div class="stat-label">Training Accuracy</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="instruction">
+                    ✏️ <strong>Draw any number (1-5)</strong> and the AI will guess what it is!
+                </div>
+
+                <div class="drawing-area">
+                    <div class="canvas-container">
+                        <canvas id="testCanvas" width="280" height="280"></canvas>
+                    </div>
+
+                    <div class="controls">
+                        <button class="clear-btn" onclick="clearTestCanvas()">Clear</button>
+                        <button onclick="predictDrawing()">Let AI Guess!</button>
+                    </div>
+
+                    <div class="prediction-result" id="predictionResult">
+                        <div style="color: #999;">Draw a number and click "Let AI Guess!"</div>
+                    </div>
+
+                    <div class="all-predictions" id="allPredictions"></div>
+                </div>
+
+                <div class="controls" style="margin-top: 30px;">
+                    <button onclick="location.reload()">Train New Model</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Training state
+        let currentDigit = 1;
+        let currentSampleForDigit = 1;
+        const samplesPerDigit = 3;
+        const digits = [1, 2, 3, 4, 5];
+        let trainingData = [];
+        let model = null;
+
+        // Canvas setup
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+
+        // Setup canvas
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 20;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Drawing functions
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            isDrawing = true;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            ctx.lineTo(x, y);
+            ctx.stroke();
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isDrawing = false;
+        });
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Convert canvas to 28x28 grayscale image data
+        function getImageData(sourceCanvas) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 28;
+            tempCanvas.height = 28;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.fillStyle = 'white';
+            tempCtx.fillRect(0, 0, 28, 28);
+            tempCtx.drawImage(sourceCanvas, 0, 0, 28, 28);
+            
+            const imageData = tempCtx.getImageData(0, 0, 28, 28);
+            const data = imageData.data;
+            
+            const grayscale = [];
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 1 - (data[i] / 255);
+                grayscale.push(gray);
+            }
+            
+            return grayscale;
+        }
+
+        function saveSample() {
+            const imageData = getImageData(canvas);
+            
+            // Save the current canvas for display
+            const sampleCanvas = document.createElement('canvas');
+            sampleCanvas.width = 60;
+            sampleCanvas.height = 60;
+            const sampleCtx = sampleCanvas.getContext('2d');
+            sampleCtx.drawImage(canvas, 0, 0, 60, 60);
+            
+            trainingData.push({
+                image: imageData,
+                label: currentDigit,
+                displayCanvas: sampleCanvas
+            });
+
+            // Update UI
+            updateSamplesDisplay();
+            clearCanvas();
+            
+            // Move to next sample/digit
+            currentSampleForDigit++;
+            
+            if (currentSampleForDigit > samplesPerDigit) {
+                // Move to next digit
+                const currentDigitIndex = digits.indexOf(currentDigit);
+                if (currentDigitIndex < digits.length - 1) {
+                    currentDigit = digits[currentDigitIndex + 1];
+                    currentSampleForDigit = 1;
+                    updatePrompt();
+                } else {
+                    // All samples collected, show immediate loading and start training
+                    showLoadingAndStartTraining();
+                }
+            } else {
+                updatePrompt();
+            }
+            
+            updateProgress();
+        }
+
+        function showLoadingAndStartTraining() {
+            // Hide training phase immediately
+            document.getElementById('trainingPhase').classList.add('hidden');
+            // Show testing phase with loading
+            document.getElementById('testingPhase').classList.remove('hidden');
+            
+            // Start training after a brief moment to let UI update
+            setTimeout(() => {
+                startTraining();
+            }, 100);
+        }
+
+        function updatePrompt() {
+            document.getElementById('requestedDigit').textContent = currentDigit;
+            document.getElementById('instructionDigit').textContent = currentDigit;
+            document.getElementById('displayDigit').textContent = currentDigit;
+            document.getElementById('currentSample').textContent = currentSampleForDigit;
+        }
+
+        function updateProgress() {
+            const totalSamples = digits.length * samplesPerDigit;
+            const collectedSamples = trainingData.length;
+            const progress = (collectedSamples / totalSamples) * 100;
+            
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
+        }
+
+        function updateSamplesDisplay() {
+            const grid = document.getElementById('samplesGrid');
+            const section = document.getElementById('samplesSection');
+            
+            // Clear and rebuild the grid
+            grid.innerHTML = '';
+            
+            trainingData.forEach((sample, idx) => {
+                const div = document.createElement('div');
+                div.className = 'sample-item';
+                
+                // Clone the canvas properly
+                const clonedCanvas = document.createElement('canvas');
+                clonedCanvas.width = 60;
+                clonedCanvas.height = 60;
+                const clonedCtx = clonedCanvas.getContext('2d');
+                clonedCtx.drawImage(sample.displayCanvas, 0, 0);
+                
+                div.appendChild(clonedCanvas);
+                
+                const label = document.createElement('div');
+                label.className = 'label';
+                label.textContent = sample.label;
+                div.appendChild(label);
+                
+                grid.appendChild(div);
+            });
+
+            // Show the section
+            section.style.display = 'block';
+            
+            // Force a scroll to show the new samples
+            setTimeout(() => {
+                section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+
+        async function startTraining() {
+            await trainModel();
+        }
+
+        async function trainModel() {
+            // Prepare data
+            const images = trainingData.map(d => d.image);
+            const labels = trainingData.map(d => d.label - 1); // Convert 1-5 to 0-4
+            
+            // Create tensors
+            const xs = tf.tensor2d(images);
+            const ys = tf.oneHot(tf.tensor1d(labels, 'int32'), 5); // 5 classes
+            
+            // Create model
+            model = tf.sequential({
+                layers: [
+                    tf.layers.reshape({ inputShape: [784], targetShape: [28, 28, 1] }),
+                    tf.layers.conv2d({ 
+                        kernelSize: 3, 
+                        filters: 16, 
+                        activation: 'relu',
+                        kernelInitializer: 'heNormal'
+                    }),
+                    tf.layers.maxPooling2d({ poolSize: 2 }),
+                    tf.layers.conv2d({ 
+                        kernelSize: 3, 
+                        filters: 32, 
+                        activation: 'relu',
+                        kernelInitializer: 'heNormal'
+                    }),
+                    tf.layers.maxPooling2d({ poolSize: 2 }),
+                    tf.layers.flatten(),
+                    tf.layers.dropout({ rate: 0.25 }),
+                    tf.layers.dense({ 
+                        units: 64, 
+                        activation: 'relu',
+                        kernelInitializer: 'heNormal'
+                    }),
+                    tf.layers.dropout({ rate: 0.5 }),
+                    tf.layers.dense({ 
+                        units: 5, 
+                        activation: 'softmax' 
+                    })
+                ]
+            });
+            
+            model.compile({
+                optimizer: tf.train.adam(0.001),
+                loss: 'categoricalCrossentropy',
+                metrics: ['accuracy']
+            });
+            
+            // Train
+            const epochs = 50;
+            await model.fit(xs, ys, {
+                epochs: epochs,
+                batchSize: 8,
+                shuffle: true,
+                validationSplit: 0.2,
+                callbacks: {
+                    onEpochEnd: (epoch, logs) => {
+                        document.getElementById('epochInfo').textContent = 
+                            `Epoch ${epoch + 1}/${epochs}`;
+                        document.getElementById('lossDisplay').textContent = 
+                            `Loss: ${logs.loss.toFixed(4)} | Accuracy: ${(logs.acc * 100).toFixed(2)}%`;
+                        
+                        document.getElementById('finalAccuracy').textContent = 
+                            `${(logs.acc * 100).toFixed(1)}%`;
+                    }
+                }
+            });
+            
+            xs.dispose();
+            ys.dispose();
+            
+            // Show test interface
+            document.getElementById('loadingTest').classList.add('hidden');
+            document.getElementById('testResults').classList.remove('hidden');
+            document.getElementById('totalSamples').textContent = trainingData.length;
+            
+            setupTestCanvas();
+        }
+
+        // Test canvas setup
+        function setupTestCanvas() {
+            const testCanvas = document.getElementById('testCanvas');
+            const testCtx = testCanvas.getContext('2d');
+            let testDrawing = false;
+
+            testCtx.fillStyle = 'white';
+            testCtx.fillRect(0, 0, testCanvas.width, testCanvas.height);
+            testCtx.strokeStyle = 'black';
+            testCtx.lineWidth = 20;
+            testCtx.lineCap = 'round';
+            testCtx.lineJoin = 'round';
+
+            testCanvas.addEventListener('mousedown', (e) => {
+                testDrawing = true;
+                const rect = testCanvas.getBoundingClientRect();
+                testCtx.beginPath();
+                testCtx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+            });
+
+            testCanvas.addEventListener('mousemove', (e) => {
+                if (!testDrawing) return;
+                const rect = testCanvas.getBoundingClientRect();
+                testCtx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                testCtx.stroke();
+            });
+
+            testCanvas.addEventListener('mouseup', () => testDrawing = false);
+            testCanvas.addEventListener('mouseout', () => testDrawing = false);
+
+            // Touch support
+            testCanvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = testCanvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                testCtx.beginPath();
+                testCtx.moveTo(x, y);
+                testDrawing = true;
+            });
+
+            testCanvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!testDrawing) return;
+                const touch = e.touches[0];
+                const rect = testCanvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                testCtx.lineTo(x, y);
+                testCtx.stroke();
+            });
+
+            testCanvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                testDrawing = false;
+            });
+        }
+
+        function clearTestCanvas() {
+            const testCanvas = document.getElementById('testCanvas');
+            const testCtx = testCanvas.getContext('2d');
+            testCtx.fillStyle = 'white';
+            testCtx.fillRect(0, 0, testCanvas.width, testCanvas.height);
+            
+            document.getElementById('predictionResult').innerHTML = 
+                '<div style="color: #999;">Draw a number and click "Let AI Guess!"</div>';
+            document.getElementById('allPredictions').innerHTML = '';
+        }
+
+        async function predictDrawing() {
+            const testCanvas = document.getElementById('testCanvas');
+            const imageData = getImageData(testCanvas);
+            
+            // Predict
+            const input = tf.tensor2d([imageData]);
+            const prediction = await model.predict(input);
+            const probabilities = await prediction.data();
+            input.dispose();
+            prediction.dispose();
+            
+            // Get predicted digit (convert back from 0-4 to 1-5)
+            let maxProb = 0;
+            let predictedIndex = 0;
+            probabilities.forEach((prob, idx) => {
+                if (prob > maxProb) {
+                    maxProb = prob;
+                    predictedIndex = idx;
+                }
+            });
+            
+            const predictedDigit = predictedIndex + 1;
+            
+            // Display result
+            const resultDiv = document.getElementById('predictionResult');
+            resultDiv.innerHTML = `
+                <div class="predicted-number">${predictedDigit}</div>
+                <div class="confidence-text">Confidence: ${(maxProb * 100).toFixed(1)}%</div>
+            `;
+            
+            // Show all predictions
+            const allPredDiv = document.getElementById('allPredictions');
+            allPredDiv.innerHTML = '';
+            
+            probabilities.forEach((prob, idx) => {
+                const digit = idx + 1;
+                const div = document.createElement('div');
+                div.className = 'prediction-item' + (digit === predictedDigit ? ' top' : '');
+                div.innerHTML = `
+                    <div class="prediction-digit">${digit}</div>
+                    <div class="prediction-confidence">${(prob * 100).toFixed(1)}%</div>
+                `;
+                allPredDiv.appendChild(div);
+            });
+        }
+
+        // Initialize
+        console.log('TensorFlow.js version:', tf.version.tfjs);
+        updatePrompt();
+    </script>
+</body>
+</html>
